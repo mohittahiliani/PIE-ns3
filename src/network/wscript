@@ -51,6 +51,7 @@ def build(bld):
         'utils/queue.cc',
         'utils/radiotap-header.cc',
         'utils/red-queue.cc',
+        'utils/pie-queue.cc',
         'utils/simple-channel.cc',
         'utils/simple-net-device.cc',
         'utils/packet-socket-client.cc',
@@ -77,6 +78,7 @@ def build(bld):
         'test/packet-metadata-test.cc',
         'test/pcap-file-test-suite.cc',
         'test/red-queue-test-suite.cc',
+        'test/pie-queue-test-suite.cc',
         'test/sequence-number-test-suite.cc',
         'test/packet-socket-apps-test-suite.cc',
         ]
@@ -134,6 +136,7 @@ def build(bld):
         'utils/queue.h',
         'utils/radiotap-header.h',
         'utils/red-queue.h',
+        'utils/pie-queue.h',
         'utils/sequence-number.h',
         'utils/sgi-hashmap.h',
         'utils/simple-channel.h',
