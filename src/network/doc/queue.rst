@@ -11,7 +11,8 @@ This section documents a few queue objects, typically associated with
 NetDevice models, that are maintained as part of the ``network`` module:
 
 * DropTail
-* Random Early Detection 
+* Random Early Detection
+* Proportional Integral controller Enhanced
 
 Model Description
 *****************
@@ -23,9 +24,9 @@ trace certain queue operations such as enqueuing, dequeuing, and dropping.
 These may be added to certain NetDevice objects that take a Ptr<Queue>
 pointer.
 
-Note that not all device models use these queue models.  
+Note that not all device models use these queue models.
 In particular, WiFi, WiMax, and LTE use specialized device queues.
-The queue models described here are more often used with simpler ns-3 
+The queue models described here are more often used with simpler ns-3
 device models such as PointToPoint and Csma.
 
 Design
@@ -64,6 +65,12 @@ rather than with a bunch of tail-drop losses (possibly incurring
 TCP timeout).  The model in ns-3 is a port of Sally Floyd's ns-2
 RED model.
 
+Proportional Integral controller Enhanced
+#########################################
+Proportional Integral controller Enhanced (PIE) is a queue variant that
+aims to solve the bufferbloat problem. The model in ns-3 is a port of
+Preethi Natarajan's ns-2 PIE model.
+
 Scope and Limitations
 =====================
 
@@ -72,8 +79,14 @@ The RED model just supports default RED.  Adaptive RED is not supported.
 References
 ==========
 
-The RED queue aims to be close to the results cited in:
-S.Floyd, K.Fall http://icir.org/floyd/papers/redsims.ps
+[1] The RED queue aims to be close to the results cited in:
+    S.Floyd, K.Fall http://icir.org/floyd/papers/redsims.ps
+
+[2] PIE queue implementation is based on the algorithm provided in:
+    R. Pan, P. Natarajan, C. Piglione, M. S. Prabhu, V. Subramanian, F. Baker and B. VerSteeg
+    "PIE: A Lightweight Control Scheme to Address the Bufferbloat Problem"
+    https://www.ietf.org/mail-archive/web/iccrg/current/pdfB57AZSheOH.pdf
+    DOI: 10.1109/HPSR.2013.6602305
 
 Usage
 *****
@@ -106,6 +119,29 @@ from ``src/network/examples/red-tests.cc``:
   p2p.SetChannelAttribute ("Delay", StringValue (redLinkDelay));
   NetDeviceContainer devn2n3 = p2p.Install (n2n3);
 
+Similarly for PIE, this is the code from example given here
+``src/network/examples/pie-tests.cc``:
+
+.. sourcecode:: cpp
+
+  PointToPointHelper p2p;
+
+  p2p.SetQueue ("ns3::DropTailQueue");
+  p2p.SetDeviceAttribute ("DataRate", StringValue ("10Mbps"));
+  p2p.SetChannelAttribute ("Delay", StringValue ("2ms"));
+  NetDeviceContainer devn0n2 = p2p.Install (n0n2);
+
+  p2p.SetQueue ("ns3::DropTailQueue");
+  p2p.SetDeviceAttribute ("DataRate", StringValue ("10Mbps"));
+  p2p.SetChannelAttribute ("Delay", StringValue ("3ms"));
+  NetDeviceContainer devn1n2 = p2p.Install (n1n2);
+
+  p2p.SetQueue ("ns3::PieQueue", // only backbone link has PIE queue
+                "LinkBandwidth", StringValue (pieLinkDataRate),
+                "LinkDelay", StringValue (pieLinkDelay));
+  p2p.SetDeviceAttribute ("DataRate", StringValue (pieLinkDataRate));
+  p2p.SetChannelAttribute ("Delay", StringValue (pieLinkDelay));
+  NetDeviceContainer devn2n3 = p2p.Install (n2n3);
 
 Attributes
 ==========
@@ -125,24 +161,38 @@ policies:
 * LinkBandwidth
 * LinkDelay
 
+The PIE queue contains a number of attributes that control the PIE
+policies:
+
+* Mode (bytes or packets)
+* MeanPktSize
+* sUpdate (time)
+* tUpdate (time)
+* qDelayRef (time)
+* dqThreshold
+* QueueLimit
+* A, B
+* LinkBandwidth
+* LinkDelay
+
 Consult the ns-3 documentation for explanation of these attributes.
 
 Output
 ======
 
 The ns-3 ascii trace helpers used by many of the NetDevices will hook
-the Enqueue, Dequeue, and Drop traces of these queues and print out 
+the Enqueue, Dequeue, and Drop traces of these queues and print out
 trace statements, such as the following from ``examples/udp/udp-echo.cc``:
 
 .. sourcecode:: text
 
-  + 2 /NodeList/0/DeviceList/1/$ns3::CsmaNetDevice/TxQueue/Enqueue ns3::EthernetHeader 
-  ( length/type=0x806, source=00:00:00:00:00:01, destination=ff:ff:ff:ff:ff:ff) 
-  ns3::ArpHeader (request source mac: 00-06-00:00:00:00:00:01 source ipv4: 10.1.1.1 
+  + 2 /NodeList/0/DeviceList/1/$ns3::CsmaNetDevice/TxQueue/Enqueue ns3::EthernetHeader
+  ( length/type=0x806, source=00:00:00:00:00:01, destination=ff:ff:ff:ff:ff:ff)
+  ns3::ArpHeader (request source mac: 00-06-00:00:00:00:00:01 source ipv4: 10.1.1.1
   dest ipv4: 10.1.1.2) Payload (size=18) ns3::EthernetTrailer (fcs=0)
-  - 2 /NodeList/0/DeviceList/1/$ns3::CsmaNetDevice/TxQueue/Dequeue ns3::EthernetHeader 
-  ( length/type=0x806, source=00:00:00:00:00:01, destination=ff:ff:ff:ff:ff:ff) 
-  ns3::ArpHeader (request source mac: 00-06-00:00:00:00:00:01 source ipv4: 10.1.1.1 
+  - 2 /NodeList/0/DeviceList/1/$ns3::CsmaNetDevice/TxQueue/Dequeue ns3::EthernetHeader
+  ( length/type=0x806, source=00:00:00:00:00:01, destination=ff:ff:ff:ff:ff:ff)
+  ns3::ArpHeader (request source mac: 00-06-00:00:00:00:00:01 source ipv4: 10.1.1.1
   dest ipv4: 10.1.1.2) Payload (size=18) ns3::EthernetTrailer (fcs=0)
 
 which shows an enqueue "+" and dequeue "-" event at time 2 seconds.
@@ -153,13 +203,13 @@ these trace sources.
 Examples
 ========
 
-The drop-tail queue is used in several examples, such as 
+The drop-tail queue is used in several examples, such as
 ``examples/udp/udp-echo.cc``.  The RED queue example is found at
-``src/network/examples/red-tests.cc``.
+``src/network/examples/red-tests.cc``. PIE queue example can be found at
+``src/network/examples/pie-tests.cc``.
 
 Validation
 **********
 
 The RED model has been validated and the report is currently stored
-at: https://github.com/downloads/talau/ns-3-tcp-red/report-red-ns3.pdf 
-
+at: https://github.com/downloads/talau/ns-3-tcp-red/report-red-ns3.pdf
