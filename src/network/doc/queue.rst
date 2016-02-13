@@ -79,14 +79,14 @@ The RED model just supports default RED.  Adaptive RED is not supported.
 References
 ==========
 
-[1] The RED queue aims to be close to the results cited in:
-    S.Floyd, K.Fall http://icir.org/floyd/papers/redsims.ps
+The RED queue aims to be close to the results cited in:
+S.Floyd, K.Fall http://icir.org/floyd/papers/redsims.ps
 
-[2] PIE queue implementation is based on the algorithm provided in:
-    R. Pan, P. Natarajan, C. Piglione, M. S. Prabhu, V. Subramanian, F. Baker and B. VerSteeg
-    "PIE: A Lightweight Control Scheme to Address the Bufferbloat Problem"
-    https://www.ietf.org/mail-archive/web/iccrg/current/pdfB57AZSheOH.pdf
-    DOI: 10.1109/HPSR.2013.6602305
+PIE queue implementation is based on the algorithm provided in:
+R. Pan, P. Natarajan, C. Piglione, M. S. Prabhu, V. Subramanian, F. Baker and B. VerSteeg
+"PIE: A Lightweight Control Scheme to Address the Bufferbloat Problem"
+https://www.ietf.org/mail-archive/web/iccrg/current/pdfB57AZSheOH.pdf
+DOI: 10.1109/HPSR.2013.6602305
 
 Usage
 *****
