@@ -129,7 +129,7 @@ PieQueueTestCase::RunPieTest ()
   // test 3: more data, but with drops
   queue = CreateObject<PieQueue> ();
   qSize = modeSize;
-  NS_TEST_EXPECT_MSG_EQ (queue->SetAttributeFailSafe ("BurstAllowance",DoubleValue (0.1)), true,
+  NS_TEST_EXPECT_MSG_EQ (queue->SetAttributeFailSafe ("MaxBurstAllowance",DoubleValue (0.1)), true,
                          "Verify that we can actually set the attribute A");
   Enqueue (queue, pktSize, 300000);
   PieQueue::Stats st2 = StaticCast<PieQueue> (queue)->GetStats ();
@@ -140,7 +140,7 @@ PieQueueTestCase::RunPieTest ()
   // test 4: more burst allowance implies more packet drops
   queue = CreateObject<PieQueue> ();
   qSize = 150 * modeSize;
-  NS_TEST_EXPECT_MSG_EQ (queue->SetAttributeFailSafe ("BurstAllowance",DoubleValue (0.4)), true,
+  NS_TEST_EXPECT_MSG_EQ (queue->SetAttributeFailSafe ("MaxBurstAllowance",DoubleValue (0.4)), true,
                          "Verify that we can actually set the attribute A");
   Enqueue (queue, pktSize, 3000000);
   PieQueue::Stats st1 = StaticCast<PieQueue> (queue)->GetStats ();
@@ -153,7 +153,7 @@ PieQueueTestCase::RunPieTest ()
   qSize = 150 * modeSize;
   NS_TEST_EXPECT_MSG_EQ (queue->SetAttributeFailSafe ("QueueLimit", UintegerValue (qSize)), true,
                          "Verify that we can actually set the   attribute QueueLimit");
-  NS_TEST_EXPECT_MSG_EQ (queue->SetAttributeFailSafe ("BurstAllowance",DoubleValue (0.1)), true,
+  NS_TEST_EXPECT_MSG_EQ (queue->SetAttributeFailSafe ("MaxBurstAllowance",DoubleValue (0.1)), true,
                          "Verify that we can actually set the attribute A");
   Enqueue (queue, pktSize, 3000000);
   PieQueue::Stats stat = StaticCast<PieQueue> (queue)->GetStats ();
