@@ -148,7 +148,7 @@ public:
   /**
    * \brief Get queue delay
    */
-  double GetQueueDelay (void);
+  Time GetQueueDelay (void);
 
   /**
    * \brief Get the drop probability
@@ -193,7 +193,6 @@ private:
    * \brief Check if packet p needs to be dropped due to probability mark
    * \param pkt packet
    * \param qlen queue length
-   * \param qlim queue limit
    * \returns 0 for no drop/mark, 1 for drop
    */
   bool DropEarly (Ptr<Packet> pkt, uint32_t qlen);
@@ -212,13 +211,13 @@ private:
 
 
   // ** Variables supplied by user
-  int m_qLim_;                                  //!< Maintains the maximum limit of the queue
+  int m_qLim;                                  //!< Maintains the maximum limit of the queue
   bool m_queueInBytes;                          //!< Checks if queue is in byte mode
   Time m_sUpdate;                               //!< Time to start the update timer
   Time m_tUpdate;                               //!< sampling timer
   Time m_qDelayRef;                             //!< desired queue delay
   uint32_t m_meanPktSize;                       //!< avg pkt size, linked into Tcl
-  double m_maxBurst;                            //!< maximum burst allowed before random early dropping kicks in
+  Time m_maxBurst;                              //!< maximum burst allowed before random early dropping kicks in
   Time m_linkDelay;                             //!< Link delay
   DataRate m_linkBandwidth;                     //!< Link bandwidth
   double m_a;                                   //!< parameters to pie controller
@@ -228,10 +227,9 @@ private:
 
   // ** Variables maintained by PIE
   double m_dropProb;                            //!< Variable used in calculation of drop probability
-  double m_accuProb;                            //!< Variable used in calculation of drop probability
   Time m_qDelayOld;                             //!< Measures the old value of queue delay
   Time m_qDelay;                                //!< Measures the value of queue delay
-  double m_burstAllowance;                      //!< current max burst size that is allowed before random drops kick in
+  Time m_burstAllowance;                        //!< current max burst value in seconds that is allowed before random drops kick in
   uint32_t m_burstReset;                        //!< Used to reset value of burst allowance
   BurstStateT m_burstState;                     //!< Used to determine the current state of burst
   uint32_t m_inMeasurement;                     //!< indicate whether we are in a measurement cycle

@@ -122,12 +122,7 @@ TypeId PieQueue::GetTypeId (void)
     .AddAttribute ("QueueLimit",
                    "Queue limit in packets",
                    UintegerValue (200),
-                   MakeUintegerAccessor (&PieQueue::m_qLim_),
-                   MakeUintegerChecker<uint32_t> ())
-    .AddAttribute ("CurrentQueuelength",
-                   "Current Queue Length",
-                   UintegerValue (0),
-                   MakeUintegerAccessor (&PieQueue::m_curq),
+                   MakeUintegerAccessor (&PieQueue::m_qLim),
                    MakeUintegerChecker<uint32_t> ())
     .AddAttribute ("DequeueThreshold",
                    "Dequeue Threshold",
@@ -139,11 +134,11 @@ TypeId PieQueue::GetTypeId (void)
                    TimeValue (Seconds (0.02)),
                    MakeTimeAccessor (&PieQueue::m_qDelayRef),
                    MakeTimeChecker ())
-    .AddAttribute ("BurstAllowance",
-                   "Current max burst size before random drop",
-                   DoubleValue (0.1),
-                   MakeDoubleAccessor (&PieQueue::m_maxBurst),
-                   MakeDoubleChecker<double> ())
+    .AddAttribute ("MaxBurstAllowance",
+                   "Current max burst allowance in seconds before random drop",
+                   TimeValue (Seconds(0.1)),
+                   MakeTimeAccessor (&PieQueue::m_maxBurst),
+                   MakeTimeChecker())
   ;
 
   return tid;
@@ -156,6 +151,8 @@ PieQueue::PieQueue ()
     m_hasPieStarted (false)
 {
   NS_LOG_FUNCTION (this);
+  
+  InitializeParams ();
   m_uv = CreateObject<UniformRandomVariable> ();
   m_rtrsEvent = Simulator::Schedule (m_sUpdate, &PieQueue::CalculateP, this);
 }
@@ -172,7 +169,6 @@ PieQueue::InitializeParams (void)
   m_inMeasurement = 0;
   m_dqCount = -1;
   m_dropProb = 0;
-  m_accuProb = 0;
   m_avgDqRate = 0.0;
   m_dqStart = 0;
   m_bytesInQueue = 0;
@@ -180,14 +176,14 @@ PieQueue::InitializeParams (void)
   m_qDelayOld = Time (Seconds (0));
   m_stats.forcedDrop = 0;
   m_stats.unforcedDrop = 0;
-
+ 
 }
 
 void
 PieQueue::SetQueueLimit (uint32_t lim)
 {
   NS_LOG_FUNCTION (this << lim);
-  m_qLim_ = lim;
+  m_qLim = lim;
 }
 
 uint32_t
@@ -197,10 +193,11 @@ PieQueue::GetQueueSize (void)
   return m_bytesInQueue;
 }
 
-double PieQueue::GetQueueDelay (void)
+Time
+PieQueue::GetQueueDelay (void)
 {
   NS_LOG_FUNCTION (this);
-  return m_qDelay.GetSeconds ();
+  return m_qDelay;
 }
 
 uint32_t
@@ -229,13 +226,12 @@ PieQueue::Reset ()
 {
   NS_LOG_FUNCTION (this);
   Ptr<Packet> p;
-  m_dropProb = 0;
-  m_accuProb = 0.0;
-  m_curq = 0;
+  InitializeParams ();
+  Simulator::Remove(m_rtrsEvent);
   m_rtrsEvent = Simulator::Schedule (m_sUpdate, &PieQueue::CalculateP, this);
   while ((p = m_packets.front ()) != 0)
     {
-      m_packets.pop ();
+    m_packets.pop ();
     }
   m_bytesInQueue = 0;
 }
@@ -254,20 +250,18 @@ PieQueue::DoEnqueue (Ptr<Packet> pkt)
   NS_LOG_FUNCTION (this << pkt);
   if (!m_hasPieStarted )
     {
-      InitializeParams ();
       m_hasPieStarted = true;
     }
 
   uint32_t QLen = m_bytesInQueue;
   m_curq = QLen;
-  uint32_t QLim = m_qLim_ * m_meanPktSize;
+  uint32_t QLim = m_qLim * m_meanPktSize;
 
   if (QLen >= QLim)
     {
       // Forced drop: reactive to full queue
       Drop (pkt);
       m_stats.forcedDrop++;
-      m_accuProb = 0;
     }
   else if (DropEarly (pkt, QLen))
     {
@@ -301,15 +295,10 @@ PieQueue::DoPeek () const
 bool PieQueue::DropEarly (Ptr<Packet> pkt, uint32_t QLen)
 {
   NS_LOG_FUNCTION (this << pkt << QLen);
-  if (m_burstAllowance > 0)
+  if (m_burstAllowance.GetSeconds() > 0)
     {
       // If there is still burst_allowance left, skip random early drop.
       return false;
-    }
-
-  if (m_dropProb == 0.0)
-    {
-      m_accuProb = 0.0;
     }
 
   if (m_burstState == NO_BURST)
@@ -325,7 +314,7 @@ bool PieQueue::DropEarly (Ptr<Packet> pkt, uint32_t QLen)
     {
       p = p * packetSize / m_meanPktSize;
     }
-  int earlyDrop = 1;
+  bool earlyDrop = 1;
   double u =  m_uv->GetValue ();
 
   if (m_qDelayOld.GetSeconds () < 0.5 * m_qDelayRef.GetSeconds () && m_dropProb < 0.2)
@@ -338,14 +327,13 @@ bool PieQueue::DropEarly (Ptr<Packet> pkt, uint32_t QLen)
     }
   if (u > p)
     {
-      earlyDrop = 0;
+      earlyDrop = false;
     }
-  if (earlyDrop == 0)
+  if (earlyDrop == false)
     {
       return false;
     }
 
-  m_accuProb = 0.0;
   return true;
 }
 
@@ -381,8 +369,9 @@ Ptr<Packet> PieQueue::DoDequeue ()
           // done with a measurement cycle
           if (m_dqCount >= (m_dqThreshold))
             {
+              
               double tmp = now - m_dqStart;
-
+             
               if (m_avgDqRate == 0)
                 {
                   m_avgDqRate = m_dqCount / tmp;
@@ -429,7 +418,7 @@ void PieQueue::CalculateP ()
 
   m_qDelay = qDelay;
 
-  if (m_burstAllowance > 0)
+  if (m_burstAllowance.GetSeconds() > 0)
     {
       m_dropProb = 0;
     }
@@ -480,13 +469,13 @@ void PieQueue::CalculateP ()
     }
 
   m_dropProb = (p > 0) ? p : 0;
-  if (m_burstAllowance < m_tUpdate.GetSeconds ())
+  if (m_burstAllowance < m_tUpdate)
     {
-      m_burstAllowance = 0;
+      m_burstAllowance =  Time (Seconds (0));
     }
   else
     {
-      m_burstAllowance -= m_tUpdate.GetSeconds ();
+      m_burstAllowance -= m_tUpdate;
     }
 
   uint32_t burstResetLimit = BURST_RESET_TIMEOUT / m_tUpdate.GetSeconds ();
@@ -495,7 +484,7 @@ void PieQueue::CalculateP ()
       m_dqCount = -1;
       m_avgDqRate = 0.0;
     }
-  if (qDelay.GetSeconds () < 0.5 * m_qDelayRef.GetSeconds () && m_qDelayOld.GetSeconds () < 0.5 * m_qDelayRef.GetSeconds () && m_dropProb == 0 && m_burstAllowance == 0)
+  if (qDelay.GetSeconds () < 0.5 * m_qDelayRef.GetSeconds () && m_qDelayOld.GetSeconds () < 0.5 * m_qDelayRef.GetSeconds () && m_dropProb == 0 && m_burstAllowance.GetSeconds() == 0)
     {
       if (m_burstState == IN_BURST_PROTECTING)
         {
@@ -518,6 +507,7 @@ void PieQueue::CalculateP ()
     }
 
   m_qDelayOld = qDelay;
+  Simulator::Remove(m_rtrsEvent);
   m_rtrsEvent = Simulator::Schedule (m_tUpdate, &PieQueue::CalculateP, this);
 }
 } //namespace ns3
