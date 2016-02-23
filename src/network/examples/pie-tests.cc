@@ -117,7 +117,7 @@ CheckQueueSize (Ptr<Queue> queue)
 void
 CheckQueueDel (Ptr<Queue> queue)
 {
-  double qDel = StaticCast<PieQueue> (queue)->GetQueueDelay ();
+  double qDel = StaticCast<PieQueue> (queue)->GetQueueDelay ().GetSeconds();
 
   // check queue size every 1/100 of a second
   Simulator::Schedule (Seconds (0.01), &CheckQueueDel, queue);
