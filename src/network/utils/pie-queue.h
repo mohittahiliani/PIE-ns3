@@ -17,7 +17,6 @@
  *
  * Authors: Shravya Ks <shravya.ks0@gmail.com>,
  *          Smriti Murali <m.smriti.95@gmail.com>,
- *          Virang vyas <virangnitk@gmail.com>,
  *          Mohit P. Tahiliani <tahiliani@nitk.edu.in>
  */
 
@@ -69,11 +68,7 @@
 #include "ns3/timer.h"
 #include "ns3/event-id.h"
 
-#define PROB_LOW 0.85
-#define PROB_HIGH 8.5
-#define MIN_PKTSIZE 64
 #define BURST_RESET_TIMEOUT 1.5
-#define LATENCY_LOW 0.005
 
 namespace ns3 {
 
@@ -83,7 +78,7 @@ class UniformRandomVariable;
 /**
  * \ingroup queue
  *
- * \brief A PIE packet queue
+ * \brief Implements PIE Active Queue Management mechanism
  */
 class PieQueue : public Queue
 {
@@ -93,17 +88,14 @@ public:
    * \return the object TypeId
    */
   static TypeId GetTypeId (void);
+
   /**
    * \brief PieQueue Constructor
-   *
-   * Create a PIE queue
    */
   PieQueue ();
 
   /**
-   * \brief Destructor
-   *
-   * Destructor
+   * \brief PieQueue Destructor
    */
   virtual ~PieQueue ();
 
@@ -112,8 +104,8 @@ public:
    */
   typedef struct
   {
-    uint32_t unforcedDrop;                      //!< Unforced drop: proactive
-    uint32_t forcedDrop;                        //!< Forced drop: reactive to full queue
+    uint32_t unforcedDrop;                      //!< Early probability drops: proactive
+    uint32_t forcedDrop;                        //!< Drops due to queue limits: reactive
   } Stats;
 
   /**
@@ -127,23 +119,32 @@ public:
   };
 
   /**
-   * \brief Get the PIE statistics after running.
+   * \brief Set the operating mode of this queue.
+   *
+   * \param mode The operating mode of this queue.
+   */
+  void SetMode (PieQueue::QueueMode mode);
+
+  /**
+   * \brief Get the encapsulation mode of this queue.
+   *
+   * \returns The encapsulation mode of this queue.
+   */
+  PieQueue::QueueMode GetMode (void);
+
+  /**
+   * \brief Get PIE statistics after running.
    *
    * \returns The drop statistics.
    */
   Stats GetStats ();
 
   /**
-   * \brief Get the current value of the queue
+   * \brief Get the current value of the queue in bytes or packets.
    *
-   * \returns The queue size
+   * \returns The queue size in bytes or packets.
    */
   uint32_t GetQueueSize (void);
-
-  /**
-   * \brief Get the drop count
-   */
-  uint32_t GetDropCount (void);
 
   /**
    * \brief Get queue delay
@@ -151,28 +152,21 @@ public:
   Time GetQueueDelay (void);
 
   /**
-   * \brief Get the drop probability
-   */
-  double GetDropProb (void);
-
-  /**
-   * \brief Set the limit of the queue.
+   * \brief Set the limit of the queue in bytes or packets.
    *
-   * \param lim The limit of the queue.
+   * \param lim The limit in bytes or packets.
    */
   void SetQueueLimit (uint32_t);
 
-
   /**
- * Assign a fixed random variable stream number to the random variables
- * used by this model.  Return the number of streams (possibly zero) that
- * have been assigned.
- *
- * \param stream first stream index to use
- * \return the number of stream indices assigned by this model
- */
+   * Assign a fixed random variable stream number to the random variables
+   * used by this model.  Return the number of streams (possibly zero) that
+   * have been assigned.
+   *
+   * \param stream first stream index to use
+   * \return the number of stream indices assigned by this model
+   */
   int64_t AssignStreams (int64_t stream);
-
 
 private:
   virtual bool DoEnqueue (Ptr<Packet> p);
@@ -180,20 +174,20 @@ private:
   virtual Ptr<const Packet> DoPeek (void) const;
 
   /**
-  * \brief Initialize the queue parameters.
-  */
+   * \brief Initialize the queue parameters.
+   */
   void InitializeParams (void);
 
   /**
-   * Reinitialise every members for next run
+   * Reinitialise every member for next run.
    */
   void Reset ();
 
   /**
-   * \brief Check if packet p needs to be dropped due to probability mark
+   * \brief Check if packet pkt needs to be dropped due to probability drop
    * \param pkt packet
-   * \param qlen queue length
-   * \returns 0 for no drop/mark, 1 for drop
+   * \param qlen Queue length
+   * \returns 0 for no drop, 1 for drop
    */
   bool DropEarly (Ptr<Packet> pkt, uint32_t qlen);
 
@@ -209,36 +203,33 @@ private:
   bool m_hasPieStarted;                         //!< True if PIE has started
   Stats m_stats;                                //!< PIE statistics
 
-
   // ** Variables supplied by user
-  int m_qLim;                                  //!< Maintains the maximum limit of the queue
-  bool m_queueInBytes;                          //!< Checks if queue is in byte mode
-  Time m_sUpdate;                               //!< Time to start the update timer
-  Time m_tUpdate;                               //!< sampling timer
-  Time m_qDelayRef;                             //!< desired queue delay
-  uint32_t m_meanPktSize;                       //!< avg pkt size, linked into Tcl
-  Time m_maxBurst;                              //!< maximum burst allowed before random early dropping kicks in
-  Time m_linkDelay;                             //!< Link delay
-  DataRate m_linkBandwidth;                     //!< Link bandwidth
-  double m_a;                                   //!< parameters to pie controller
-  double m_b;                                   //!< parameters to pie controller
-  uint32_t m_dqThreshold;                       //!< threshold that needs to be across before a sample of the dequeue rate is measured
-
+  QueueMode m_mode;                             //!< Mode (bytes or packets)
+  uint32_t m_qLim;                              //!< Maintains the maximum limit of the queue
+  Time m_sUpdate;                               //!< Start time of the update timer
+  Time m_tUpdate;                               //!< Time period after which CalculateP () is called
+  Time m_qDelayRef;                             //!< Desired queue delay
+  uint32_t m_meanPktSize;                       //!< Average packet size in bytes
+  Time m_maxBurst;                              //!< Maximum burst allowed before random early dropping kicks in
+  Time m_linkDelay;                             //!< Bottleneck link delay
+  DataRate m_linkBandwidth;                     //!< Bottleneck link bandwidth
+  double m_a;                                   //!< Parameter to pie controller
+  double m_b;                                   //!< Parameter to pie controller
+  uint32_t m_dqThreshold;                       //!< Minimum queue size in bytes before dequeue rate is measured
 
   // ** Variables maintained by PIE
   double m_dropProb;                            //!< Variable used in calculation of drop probability
-  Time m_qDelayOld;                             //!< Measures the old value of queue delay
-  Time m_qDelay;                                //!< Measures the value of queue delay
-  Time m_burstAllowance;                        //!< current max burst value in seconds that is allowed before random drops kick in
+  Time m_qDelayOld;                             //!< Old value of queue delay
+  Time m_qDelay;                                //!< Current value of queue delay
+  Time m_burstAllowance;                        //!< Current max burst value in seconds that is allowed before random drops kick in
   uint32_t m_burstReset;                        //!< Used to reset value of burst allowance
   BurstStateT m_burstState;                     //!< Used to determine the current state of burst
-  uint32_t m_inMeasurement;                     //!< indicate whether we are in a measurement cycle
-  double m_avgDqRate;                           //!< time averaged dequeue rate
-  double m_dqStart;                             //!< the start timestamp of current measurement cycle
-  uint32_t m_dqCount;                           //!< number of bytes departed since current measurement cycle starts
-  uint32_t m_curq;                              //!< helps to trace queue during arrival, if enabled
+  uint32_t m_inMeasurement;                     //!< Indicates whether we are in a measurement cycle
+  double m_avgDqRate;                           //!< Time averaged dequeue rate
+  double m_dqStart;                             //!< Start timestamp of current measurement cycle
+  uint32_t m_dqCount;                           //!< Number of bytes departed since current measurement cycle starts
   EventId m_rtrsEvent;                          //!< Event used to decide the decision of interval of drop probability calculation
-  Ptr<UniformRandomVariable> m_uv;              //!< rng stream
+  Ptr<UniformRandomVariable> m_uv;              //!< Rng stream
 
 };
 
